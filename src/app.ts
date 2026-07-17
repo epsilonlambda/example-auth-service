@@ -1,16 +1,15 @@
 import type { JsonSchemaToTsProvider } from "@fastify/type-provider-json-schema-to-ts";
 import fastify, { type FastifyServerOptions } from "fastify";
+import type { AppDeps } from "./deps.ts";
 import { applyErrorEnvelope } from "./error-envelope.ts";
-import { echoRoutes } from "./routes/echo.ts";
 import { healthRoutes } from "./routes/health.ts";
+import { usersRoutes } from "./routes/users.ts";
 
-export function buildApp(opts: FastifyServerOptions = {}) {
+export function buildApp(opts: FastifyServerOptions, deps: AppDeps) {
   const app = fastify({
     ...opts,
     ajv: {
       customOptions: {
-        // Fastify's Ajv defaults silently strip unknown body properties and
-        // coerce types; a strict request contract must reject both.
         removeAdditional: false,
         coerceTypes: false,
       },
@@ -24,8 +23,8 @@ export function buildApp(opts: FastifyServerOptions = {}) {
   applyErrorEnvelope(app);
 
   const typed = app.withTypeProvider<JsonSchemaToTsProvider>();
-  typed.register(echoRoutes);
-  typed.register(healthRoutes);
+  typed.register(usersRoutes, deps);
+  typed.register(healthRoutes, { redis: deps.redis });
 
   return typed;
 }
