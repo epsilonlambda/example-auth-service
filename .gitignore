@@ -5,3 +5,8 @@ node_modules/
 coverage/
 *.tsbuildinfo
 .DS_Store
+
+# Local environment files; .env.example is the committed reference.
+.env
+.env.*
+!.env.example
