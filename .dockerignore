@@ -1,0 +1,8 @@
+node_modules/
+.git/
+docs/
+.idea/
+test/
+.github/
+coverage/
+.DS_Store
