@@ -147,10 +147,17 @@ function rejection(code: PolicyCode, message: string): PolicyResult {
   return { ok: false, code, message };
 }
 
+// The single definition of the form that gets hashed: NFC so canonically
+// equivalent inputs collapse to the same code points (D15). Registration and
+// login both pass through here so the bytes measured are the bytes verified.
+export function normalizePassword(password: string): string {
+  return password.normalize("NFC");
+}
+
 // Checks run against the NFC-normalized password; the accepted result carries
 // the normalized form so the same bytes are hashed that were measured here.
 export function checkPassword(password: string, username: string): PolicyResult {
-  const normalized = password.normalize("NFC");
+  const normalized = normalizePassword(password);
   const count = codePointCount(normalized);
 
   if (count < PASSWORD_MIN_CODE_POINTS) {

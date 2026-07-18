@@ -11,6 +11,7 @@ const skip = baseUrl ? false : "E2E_BASE_URL not set";
 // Unique per run, so the persistent volume never turns a rerun into a 409.
 const username = `e2e-${randomUUID().slice(0, 8)}`;
 const password = "sturdy-passphrase-9x7q2m4";
+const challenge = 'Basic realm="auth", charset="UTF-8"';
 
 function createUser(body: unknown) {
   return fetch(`${baseUrl}/api/v1/users`, {
@@ -20,6 +21,10 @@ function createUser(body: unknown) {
   });
 }
 
+function basicHeader(user: string, pass: string): string {
+  return `Basic ${Buffer.from(`${user}:${pass}`, "utf8").toString("base64")}`;
+}
+
 test("GET /health responds ok over real HTTP", { skip }, async () => {
   const res = await fetch(`${baseUrl}/health`);
 
@@ -27,7 +32,7 @@ test("GET /health responds ok over real HTTP", { skip }, async () => {
   assert.deepEqual(await res.json(), { status: "ok" });
 });
 
-test("registration golden path: 201 then 409 on the same username", { skip }, async () => {
+test("golden path: register, reject duplicate, then authenticate", { skip }, async () => {
   const created = await createUser({ username, password });
   assert.equal(created.status, 201);
   assert.deepEqual(await created.json(), { username });
@@ -37,6 +42,23 @@ test("registration golden path: 201 then 409 on the same username", { skip }, as
   assert.equal(duplicate.status, 409);
   const body = (await duplicate.json()) as { error: { code: string } };
   assert.equal(body.error.code, "username_taken");
+
+  const ok = await fetch(`${baseUrl}/api/v1/users/${username}`, {
+    headers: { authorization: basicHeader(username, password) },
+  });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(await ok.json(), { username });
+  assert.equal(ok.headers.get("cache-control"), "no-store");
+
+  const wrong = await fetch(`${baseUrl}/api/v1/users/${username}`, {
+    headers: { authorization: basicHeader(username, "totally-the-wrong-password") },
+  });
+  assert.equal(wrong.status, 401);
+  assert.equal(wrong.headers.get("www-authenticate"), challenge);
+
+  const noHeader = await fetch(`${baseUrl}/api/v1/users/${username}`);
+  assert.equal(noHeader.status, 401);
+  assert.equal(noHeader.headers.get("www-authenticate"), challenge);
 });
 
 test("weak password is rejected with its specific code", { skip }, async () => {

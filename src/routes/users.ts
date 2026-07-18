@@ -1,12 +1,17 @@
 import type { FastifyPluginAsyncJsonSchemaToTs } from "@fastify/type-provider-json-schema-to-ts";
+import type { FastifyReply } from "fastify";
+import { parseBasicAuth } from "../basic-auth.ts";
+import { hashPassword, verifyPassword } from "../crypto.ts";
 import type { AppDeps } from "../deps.ts";
-import { AppError } from "../error-envelope.ts";
-import { checkPassword, PASSWORD_MAX_CODE_POINTS } from "../password-policy.ts";
+import { AppError, makeErrorEnvelope } from "../error-envelope.ts";
+import { checkPassword, normalizePassword, PASSWORD_MAX_CODE_POINTS } from "../password-policy.ts";
 
 // Lowercase subset of the POSIX portable-username charset, first character
 // alphanumeric, 3-32 chars. Doubles as Redis key-injection defense: the
 // username goes into the key verbatim.
 const USERNAME_PATTERN = "^[a-z0-9][a-z0-9._-]{2,31}$";
+
+const WWW_AUTHENTICATE = 'Basic realm="auth", charset="UTF-8"';
 
 const createUserBodySchema = {
   type: "object",
@@ -23,7 +28,7 @@ const createUserBodySchema = {
   },
 } as const;
 
-const createdResponseSchema = {
+const principalResponseSchema = {
   type: "object",
   required: ["username"],
   additionalProperties: false,
@@ -32,16 +37,49 @@ const createdResponseSchema = {
   },
 } as const;
 
+const errorResponseSchema = {
+  type: "object",
+  required: ["error"],
+  additionalProperties: false,
+  properties: {
+    error: {
+      type: "object",
+      required: ["code", "message"],
+      additionalProperties: false,
+      properties: {
+        code: { type: "string" },
+        message: { type: "string" },
+      },
+    },
+  },
+} as const;
+
+const authenticateParamsSchema = {
+  type: "object",
+  required: ["username"],
+  additionalProperties: false,
+  properties: {
+    username: { type: "string" },
+  },
+} as const;
+
+function challenge(reply: FastifyReply, code: string, message: string) {
+  return reply
+    .status(401)
+    .header("www-authenticate", WWW_AUTHENTICATE)
+    .send(makeErrorEnvelope(code, message));
+}
+
 export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs<{ Options: AppDeps }> = async (
   app,
-  { redis, hashPassword },
+  { redis },
 ) => {
   app.post(
     "/api/v1/users",
     {
       schema: {
         body: createUserBodySchema,
-        response: { 201: createdResponseSchema },
+        response: { 201: principalResponseSchema },
       },
     },
     async (request, reply) => {
@@ -61,6 +99,58 @@ export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs<{ Options: AppDeps }>
       }
 
       return reply.status(201).header("location", `/api/v1/users/${username}`).send({ username });
+    },
+  );
+
+  app.get(
+    "/api/v1/users/:username",
+    {
+      schema: {
+        params: authenticateParamsSchema,
+        response: {
+          200: principalResponseSchema,
+          400: errorResponseSchema,
+          401: errorResponseSchema,
+        },
+      },
+      onSend: async (_request, reply, payload) => {
+        reply.header("cache-control", "no-store");
+        reply.header("pragma", "no-cache");
+        return payload;
+      },
+    },
+    async (request, reply) => {
+      const { username } = request.params;
+
+      const credentials = parseBasicAuth(request.headers.authorization);
+      if (credentials === null) {
+        return challenge(reply, "unauthorized", "authentication required");
+      }
+
+      if (credentials.username !== username) {
+        return reply
+          .status(400)
+          .send(
+            makeErrorEnvelope("username_mismatch", "credentials do not match the requested user"),
+          );
+      }
+
+      const normalizedPassword = normalizePassword(credentials.password);
+
+      const storedUserData = await redis.get(`user:${username}`);
+      if (!storedUserData) {
+        // Mitigate user enumeration via a timing-attack - perform same amount of work on auth attempts
+        // for users that don't exist
+        await hashPassword(normalizedPassword);
+      } else {
+        const storedHash = (JSON.parse(storedUserData) as { passwordHash: string }).passwordHash;
+        const isPasswordVerified = await verifyPassword(storedHash, normalizedPassword);
+
+        if (isPasswordVerified) {
+          return reply.status(200).send({ username });
+        }
+      }
+      return challenge(reply, "invalid_credentials", "invalid credentials");
     },
   );
 };

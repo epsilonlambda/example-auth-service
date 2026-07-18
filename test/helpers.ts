@@ -13,6 +13,7 @@ export interface SetCall {
 export function makeFakeRedis() {
   const store = new Map<string, string>();
   const setCalls: SetCall[] = [];
+  const getCalls: string[] = [];
   let pingError: Error | null = null;
 
   const redis: RedisLike = {
@@ -23,6 +24,10 @@ export function makeFakeRedis() {
       }
       store.set(key, value);
       return "OK";
+    },
+    async get(key) {
+      getCalls.push(key);
+      return store.get(key) ?? null;
     },
     async ping() {
       if (pingError) {
@@ -36,35 +41,22 @@ export function makeFakeRedis() {
     redis,
     store,
     setCalls,
+    getCalls,
     failPing(err: Error = new Error("connection refused")) {
       pingError = err;
     },
   };
 }
 
-// Deterministic, recognizable, and deliberately unrelated to its input so
-// "plaintext never reaches the store" stays assertable.
-export function makeFakeHasher() {
-  const calls: string[] = [];
-  async function hashPassword(password: string): Promise<string> {
-    calls.push(password);
-    return `$argon2id$fake$${calls.length}`;
-  }
-  return { hashPassword, hashCalls: calls };
-}
-
+// Real argon2 runs: the routes import crypto directly, so only Redis is faked.
 export function buildTestApp(opts: FastifyServerOptions = {}) {
   const fakeRedis = makeFakeRedis();
-  const fakeHasher = makeFakeHasher();
-  const app = buildApp(opts, {
-    redis: fakeRedis.redis,
-    hashPassword: fakeHasher.hashPassword,
-  });
+  const app = buildApp(opts, { redis: fakeRedis.redis });
   return {
     app,
     store: fakeRedis.store,
     setCalls: fakeRedis.setCalls,
+    getCalls: fakeRedis.getCalls,
     failPing: fakeRedis.failPing,
-    hashCalls: fakeHasher.hashCalls,
   };
 }

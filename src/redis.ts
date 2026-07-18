@@ -14,6 +14,7 @@ export function createRedisConnection(url: string): RedisConnection {
   return {
     redis: {
       set: (key, value, options) => client.set(key, value, options),
+      get: (key) => client.get(key),
       ping: () => client.ping(),
     },
     async connect() {

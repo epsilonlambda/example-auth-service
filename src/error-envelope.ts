@@ -37,14 +37,14 @@ export class AppError extends Error {
   }
 }
 
-function envelope(code: string, message: string) {
+export function makeErrorEnvelope(code: string, message: string) {
   return { error: { code, message } };
 }
 
 export function applyErrorEnvelope(app: FastifyInstance): void {
   app.setErrorHandler((error: FastifyError, request: FastifyRequest, reply: FastifyReply) => {
     if (error instanceof AppError) {
-      return reply.status(error.statusCode).send(envelope(error.code, error.message));
+      return reply.status(error.statusCode).send(makeErrorEnvelope(error.code, error.message));
     }
 
     const statusCode = error.statusCode ?? 500;
@@ -52,26 +52,28 @@ export function applyErrorEnvelope(app: FastifyInstance): void {
     if (statusCode >= 500) {
       // Internals never leak to callers: log the real error, send a fixed body.
       request.log.error({ err: error }, "request failed");
-      return reply.status(statusCode).send(envelope("internal_error", "internal server error"));
+      return reply
+        .status(statusCode)
+        .send(makeErrorEnvelope("internal_error", "internal server error"));
     }
 
     if (error.validation) {
-      return reply.status(statusCode).send(envelope("validation_error", error.message));
+      return reply.status(statusCode).send(makeErrorEnvelope("validation_error", error.message));
     }
 
     const known = KNOWN_4XX[error.code];
     if (known) {
-      return reply.status(statusCode).send(envelope(known.code, known.message));
+      return reply.status(statusCode).send(makeErrorEnvelope(known.code, known.message));
     }
 
     // Unknown 4xx: keep the status, suppress the message we didn't author.
     request.log.warn({ err: error }, "unmapped 4xx error");
-    return reply.status(statusCode).send(envelope("bad_request", "bad request"));
+    return reply.status(statusCode).send(makeErrorEnvelope("bad_request", "bad request"));
   });
 
   app.setNotFoundHandler((request: FastifyRequest, reply: FastifyReply) => {
     return reply
       .status(404)
-      .send(envelope("not_found", `${request.method} ${request.url} not found`));
+      .send(makeErrorEnvelope("not_found", `${request.method} ${request.url} not found`));
   });
 }

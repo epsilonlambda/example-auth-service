@@ -1,15 +1,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { verifyPassword } from "../src/crypto.ts";
 import { buildTestApp } from "./helpers.ts";
+
+type TestApp = ReturnType<typeof buildTestApp>["app"];
 
 const GOOD_PASSWORD = "h7q9w2x8k3vn5pz";
 
-function register(app: ReturnType<typeof buildTestApp>["app"], payload: unknown) {
+function register(app: TestApp, payload: unknown) {
   return app.inject({ method: "POST", url: "/api/v1/users", payload: payload as object });
 }
 
 test("creates a user: 201, Location header, minimal body", async (t) => {
-  const { app, store, setCalls, hashCalls } = buildTestApp();
+  const { app, store, setCalls } = buildTestApp();
   t.after(() => app.close());
 
   const res = await register(app, { username: "kirill", password: GOOD_PASSWORD });
@@ -18,13 +21,14 @@ test("creates a user: 201, Location header, minimal body", async (t) => {
   assert.deepEqual(res.json(), { username: "kirill" });
   assert.equal(res.headers.location, "/api/v1/users/kirill");
 
-  assert.deepEqual(hashCalls, [GOOD_PASSWORD]);
   assert.equal(setCalls.length, 1);
   const call = setCalls[0];
   assert.ok(call);
   assert.equal(call.key, "user:kirill");
   assert.deepEqual(call.options, { condition: "NX" });
-  assert.deepEqual(JSON.parse(call.value), { passwordHash: "$argon2id$fake$1" });
+  const stored = JSON.parse(call.value) as { passwordHash: string };
+  assert.match(stored.passwordHash, /^\$argon2id\$v=19\$/);
+  assert.equal(await verifyPassword(stored.passwordHash, GOOD_PASSWORD), true);
   assert.equal(store.size, 1);
 });
 
@@ -55,8 +59,8 @@ test("duplicate username: 409 username_taken, store unchanged", async (t) => {
   assert.equal(store.size, 1);
 });
 
-test("username violations: 400 validation_error, no hashing, no store I/O", async (t) => {
-  const { app, setCalls, hashCalls } = buildTestApp();
+test("username violations: 400 validation_error, nothing stored", async (t) => {
+  const { app, setCalls } = buildTestApp();
   t.after(() => app.close());
 
   const badUsernames = [
@@ -75,12 +79,11 @@ test("username violations: 400 validation_error, no hashing, no store I/O", asyn
     assert.equal(res.json().error.code, "validation_error");
   }
 
-  assert.deepEqual(hashCalls, []);
   assert.deepEqual(setCalls, []);
 });
 
-test("policy rejections: specific codes, no hashing, no store I/O", async (t) => {
-  const { app, setCalls, hashCalls } = buildTestApp();
+test("policy rejections: specific codes, nothing stored", async (t) => {
+  const { app, setCalls } = buildTestApp();
   t.after(() => app.close());
 
   const cases: Array<[string, string]> = [
@@ -99,7 +102,6 @@ test("policy rejections: specific codes, no hashing, no store I/O", async (t) =>
     assert.equal(res.json().error.code, code);
   }
 
-  assert.deepEqual(hashCalls, []);
   assert.deepEqual(setCalls, []);
 });
 
@@ -107,11 +109,7 @@ test("rejects unknown extra properties", async (t) => {
   const { app } = buildTestApp();
   t.after(() => app.close());
 
-  const res = await register(app, {
-    username: "kirill",
-    password: GOOD_PASSWORD,
-    extra: "nope",
-  });
+  const res = await register(app, { username: "kirill", password: GOOD_PASSWORD, extra: "nope" });
 
   assert.equal(res.statusCode, 400);
   assert.equal(res.json().error.code, "validation_error");

@@ -1,12 +1,14 @@
 import { buildApp } from "./app.ts";
-import { hashPassword } from "./crypto.ts";
+import { assertCryptoCapability } from "./boot-check.ts";
 import { createRedisConnection } from "./redis.ts";
+
+assertCryptoCapability();
 
 const port = Number(process.env.PORT ?? 3000);
 const redisUrl = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";
 
 const connection = createRedisConnection(redisUrl);
-const app = buildApp({ logger: true }, { redis: connection.redis, hashPassword });
+const app = buildApp({ logger: true }, { redis: connection.redis });
 
 connection.onError((err) => app.log.error({ err }, "redis client error"));
 
