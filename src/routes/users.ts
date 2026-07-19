@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword } from "../crypto.ts";
 import type { AppDeps } from "../deps.ts";
 import { AppError, makeErrorEnvelope } from "../error-envelope.ts";
 import { checkPassword, normalizePassword, PASSWORD_MAX_CODE_POINTS } from "../password-policy.ts";
+import { registerAttempt, resetFailures } from "../throttle.ts";
 
 // Lowercase subset of the POSIX portable-username charset, first character
 // alphanumeric, 3-32 chars. Doubles as Redis key-injection defense: the
@@ -111,6 +112,7 @@ export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs<{ Options: AppDeps }>
           200: principalResponseSchema,
           400: errorResponseSchema,
           401: errorResponseSchema,
+          429: errorResponseSchema,
         },
       },
       onSend: async (_request, reply, payload) => {
@@ -135,6 +137,14 @@ export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs<{ Options: AppDeps }>
           );
       }
 
+      const retryAfter = await registerAttempt(redis, username);
+      if (retryAfter !== null) {
+        return reply
+          .status(429)
+          .header("retry-after", String(retryAfter))
+          .send(makeErrorEnvelope("rate_limited", "too many failed attempts, try again later"));
+      }
+
       const normalizedPassword = normalizePassword(credentials.password);
 
       const storedUserData = await redis.get(`user:${username}`);
@@ -147,9 +157,11 @@ export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs<{ Options: AppDeps }>
         const isPasswordVerified = await verifyPassword(storedHash, normalizedPassword);
 
         if (isPasswordVerified) {
+          await resetFailures(redis, username);
           return reply.status(200).send({ username });
         }
       }
+
       return challenge(reply, "invalid_credentials", "invalid credentials");
     },
   );

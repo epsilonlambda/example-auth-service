@@ -68,3 +68,30 @@ test("weak password is rejected with its specific code", { skip }, async () => {
   const body = (await res.json()) as { error: { code: string } };
   assert.equal(body.error.code, "password_too_short");
 });
+
+test("throttle: repeated wrong passwords return 429 + Retry-After", { skip }, async () => {
+  const throttleUser = `e2e-${randomUUID().slice(0, 8)}`;
+  const created = await createUser({ username: throttleUser, password });
+  assert.equal(created.status, 201);
+
+  // Bounded so a broken throttle fails the test instead of looping; the real
+  // limit is well under this budget.
+  let throttled: Response | undefined;
+  for (let i = 0; i < 30; i++) {
+    const res = await fetch(`${baseUrl}/api/v1/users/${throttleUser}`, {
+      headers: { authorization: basicHeader(throttleUser, "wrong-password-guess") },
+    });
+    if (res.status === 429) {
+      throttled = res;
+      break;
+    }
+    assert.equal(res.status, 401, `attempt ${i} before the limit should be 401`);
+  }
+
+  assert.ok(throttled, "expected a 429 within the attempt budget");
+  const retryAfter = Number(throttled.headers.get("retry-after"));
+  assert.ok(Number.isInteger(retryAfter) && retryAfter > 0, "Retry-After is a positive integer");
+  const body = (await throttled.json()) as { error: { code: string } };
+  assert.equal(body.error.code, "rate_limited");
+  assert.equal(throttled.headers.get("cache-control"), "no-store");
+});

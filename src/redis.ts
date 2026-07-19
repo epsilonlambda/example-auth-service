@@ -16,6 +16,18 @@ export function createRedisConnection(url: string): RedisConnection {
       set: (key, value, options) => client.set(key, value, options),
       get: (key) => client.get(key),
       ping: () => client.ping(),
+      incrementCounter: async (key, windowSeconds) => {
+        const [count, , ttl] = await client
+          .multi()
+          .incr(key)
+          .expire(key, windowSeconds, "NX")
+          .ttl(key)
+          .exec();
+        return { count: Number(count), ttl: Number(ttl) };
+      },
+      clearCounter: async (key) => {
+        await client.del(key);
+      },
     },
     async connect() {
       await client.connect();

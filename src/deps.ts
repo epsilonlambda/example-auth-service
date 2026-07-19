@@ -5,6 +5,8 @@ export interface RedisLike {
   set(key: string, value: string, options: { condition: "NX" }): Promise<string | null>;
   get(key: string): Promise<string | null>;
   ping(): Promise<string>;
+  incrementCounter(key: string, windowSeconds: number): Promise<{ count: number; ttl: number }>;
+  clearCounter(key: string): Promise<void>;
 }
 
 export interface AppDeps {

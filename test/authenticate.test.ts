@@ -118,7 +118,7 @@ const RETRIES = 3;
 const MIN_RATIO = 0.5;
 
 test("unknown-user path spends the same work as wrong-password (no timing oracle)", async (t) => {
-  const { app } = buildTestApp();
+  const { app, throttleStore } = buildTestApp();
   t.after(() => app.close());
   await register(app, USERNAME, PASSWORD);
 
@@ -129,12 +129,16 @@ test("unknown-user path spends the same work as wrong-password (no timing oracle
   }
 
   async function measureRatio(): Promise<number> {
+    // Reset the failure counter each sample so the throttle never trips
+    // mid-measurement: this test times per-attempt work, not the throttle.
+    throttleStore.clear();
     await timeAuth(USERNAME, basic(USERNAME, "warmup-wrong")); // warmup
     await timeAuth("ghost-warmup", basic("ghost-warmup", PASSWORD));
 
     const wrong: number[] = [];
     const unknown: number[] = [];
     for (let i = 0; i < SAMPLES; i++) {
+      throttleStore.clear();
       wrong.push(await timeAuth(USERNAME, basic(USERNAME, `wrong-${i}`)));
       unknown.push(await timeAuth(`ghost-${i}`, basic(`ghost-${i}`, PASSWORD)));
     }

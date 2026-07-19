@@ -1,0 +1,33 @@
+import type { RedisLike } from "./deps.ts";
+
+// Per-username login throttle (D23/D36/D47), NIST SP 800-63B-4 rate-limiting.
+// registerAttempt increments and gates in one atomic step *before* hashing: the
+// returned count is the exact gate, so a concurrent burst cannot slip past a
+// read-only check and trigger unbounded argon2. Every attempt counts and a
+// success resets (resetFailures) - "consecutive failures" by another name.
+// Keyed by the attempted username regardless of existence, so a throttled
+// response cannot enumerate accounts. Fixed window from the first attempt in a
+// streak (EXPIRE NX sets the TTL once); Retry-After is the remaining TTL.
+export const THROTTLE_MAX_FAILURES = 10;
+export const THROTTLE_WINDOW_SECONDS = 900;
+
+function throttleKey(username: string): string {
+  return `throttle:${username}`;
+}
+
+// Counts this attempt and returns the Retry-After seconds if it is over the
+// limit, else null to proceed.
+export async function registerAttempt(redis: RedisLike, username: string): Promise<number | null> {
+  const { count, ttl } = await redis.incrementCounter(
+    throttleKey(username),
+    THROTTLE_WINDOW_SECONDS,
+  );
+  if (count > THROTTLE_MAX_FAILURES) {
+    return ttl > 0 ? ttl : THROTTLE_WINDOW_SECONDS;
+  }
+  return null;
+}
+
+export async function resetFailures(redis: RedisLike, username: string): Promise<void> {
+  await redis.clearCounter(throttleKey(username));
+}
