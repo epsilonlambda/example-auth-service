@@ -4,6 +4,7 @@
 
 export const PASSWORD_MIN_CODE_POINTS = 15;
 export const PASSWORD_MAX_CODE_POINTS = 512;
+export const USERNAME_MIN_CODE_POINTS = 3;
 
 export type PolicyCode =
   | "password_too_short"
@@ -13,7 +14,8 @@ export type PolicyCode =
   | "password_sequence"
   | "password_contains_username"
   | "password_contains_service_name"
-  | "password_common";
+  | "password_common"
+  | "username_too_short";
 
 export type PolicyResult =
   | { ok: true; normalized: string }
@@ -156,7 +158,14 @@ export function normalizePassword(password: string): string {
 
 // Checks run against the NFC-normalized password; the accepted result carries
 // the normalized form so the same bytes are hashed that were measured here.
-export function checkPassword(password: string, username: string): PolicyResult {
+export function validatePassword(password: string, username: string): PolicyResult {
+  if (codePointCount(normalizePassword(username)) < USERNAME_MIN_CODE_POINTS) {
+    return rejection(
+      "username_too_short",
+      `username must be at least ${USERNAME_MIN_CODE_POINTS} characters`,
+    );
+  }
+
   const normalized = normalizePassword(password);
   const count = codePointCount(normalized);
 

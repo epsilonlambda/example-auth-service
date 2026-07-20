@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkPassword } from "#app/auth/password-policy.ts";
+import { validatePassword } from "#app/auth/password-policy.ts";
 
 const USERNAME = "kirill";
 
@@ -11,7 +11,7 @@ const COMPOSED_E_ACUTE = String.fromCodePoint(0x00e9);
 const DECOMPOSED_E_ACUTE = String.fromCodePoint(0x0065, 0x0301);
 
 function expectRejection(password: string, code: string, username = USERNAME) {
-  const result = checkPassword(password, username);
+  const result = validatePassword(password, username);
   assert.equal(result.ok, false, `expected rejection for ${JSON.stringify(password)}`);
   if (!result.ok) {
     assert.equal(result.code, code);
@@ -20,13 +20,13 @@ function expectRejection(password: string, code: string, username = USERNAME) {
 }
 
 test("accepts a strong password and returns the normalized form", () => {
-  const result = checkPassword("h7q9w2x8k3vn5pz", USERNAME);
+  const result = validatePassword("h7q9w2x8k3vn5pz", USERNAME);
   assert.deepEqual(result, { ok: true, normalized: "h7q9w2x8k3vn5pz" });
 });
 
 test("rejects 14 code points, accepts 15 (boundary)", () => {
   expectRejection("h7q9w2x8k3vn5p", "password_too_short");
-  assert.equal(checkPassword("h7q9w2x8k3vn5pz", USERNAME).ok, true);
+  assert.equal(validatePassword("h7q9w2x8k3vn5pz", USERNAME).ok, true);
 });
 
 test("rejects passwords above the maximum", () => {
@@ -38,13 +38,13 @@ test("counts code points after NFC normalization, not raw units", () => {
   // NFC composes them - the floor is measured post-NFC, so this is too short.
   expectRejection(`xk9wqz${DECOMPOSED_E_ACUTE.repeat(8)}`, "password_too_short");
   // 14 plain chars + 1 decomposed pair = exactly 15 post-NFC.
-  const result = checkPassword(`h7q9w2x8k3vn5p${DECOMPOSED_E_ACUTE}`, USERNAME);
+  const result = validatePassword(`h7q9w2x8k3vn5p${DECOMPOSED_E_ACUTE}`, USERNAME);
   assert.equal(result.ok, true);
 });
 
 test("accepted result carries the NFC-normalized form, not the input", () => {
   const decomposed = `h7q9w2x8k3vn5p${DECOMPOSED_E_ACUTE}`;
-  const result = checkPassword(decomposed, USERNAME);
+  const result = validatePassword(decomposed, USERNAME);
   assert.equal(result.ok, true);
   if (result.ok) {
     assert.equal(result.normalized, `h7q9w2x8k3vn5p${COMPOSED_E_ACUTE}`);
@@ -89,6 +89,6 @@ test("rejects residual-blocklist entries, case-insensitively", () => {
 });
 
 test("near-miss of a blocklist entry passes the residual check", () => {
-  const result = checkPassword("manchesterunited1", USERNAME);
+  const result = validatePassword("manchesterunited1", USERNAME);
   assert.equal(result.ok, true);
 });

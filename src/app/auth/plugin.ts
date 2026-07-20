@@ -1,18 +1,20 @@
 import type { FastifyPluginAsyncJsonSchemaToTs } from "@fastify/type-provider-json-schema-to-ts";
-import type { FastifyReply } from "fastify";
 import fp from "fastify-plugin";
 import { AppError, makeErrorEnvelope } from "#app/error-envelope.ts";
 import { challenge, parseBasicAuth } from "./basic-auth.ts";
 import { hashPassword, verifyPassword } from "./crypto.ts";
-import { checkPassword, normalizePassword, PASSWORD_MAX_CODE_POINTS } from "./password-policy.ts";
+import {
+  normalizePassword,
+  PASSWORD_MAX_CODE_POINTS,
+  USERNAME_MIN_CODE_POINTS,
+  validatePassword,
+} from "./password-policy.ts";
 import { registerAttempt, resetFailures } from "./throttle.ts";
 
 // Lowercase subset of the POSIX portable-username charset, first character
 // alphanumeric, 3-32 chars. Doubles as Redis key-injection defense: the
 // username goes into the key verbatim.
-const USERNAME_PATTERN = "^[a-z0-9][a-z0-9._-]{2,31}$";
-
-const WWW_AUTHENTICATE = 'Basic realm="auth", charset="UTF-8"';
+const USERNAME_PATTERN = `^[a-z0-9][a-z0-9._-]{${USERNAME_MIN_CODE_POINTS - 1},31}$`;
 
 const createUserBodySchema = {
   type: "object",
@@ -21,7 +23,7 @@ const createUserBodySchema = {
   properties: {
     username: {
       type: "string",
-      minLength: 3,
+      minLength: USERNAME_MIN_CODE_POINTS,
       maxLength: 32,
       pattern: USERNAME_PATTERN,
     },
@@ -76,7 +78,7 @@ const authRoutes: FastifyPluginAsyncJsonSchemaToTs = async (app) => {
     async (request, reply) => {
       const { username, password } = request.body;
 
-      const verdict = checkPassword(password, username);
+      const verdict = validatePassword(password, username);
       if (!verdict.ok) {
         throw new AppError(400, verdict.code, verdict.message);
       }
