@@ -49,3 +49,49 @@ test("each hash carries a fresh salt yet both verify", async () => {
   assert.equal(await verifyPassword(first, PASSWORD), true);
   assert.equal(await verifyPassword(second, PASSWORD), true);
 });
+
+test("hashes and verifies a non-ASCII password", async () => {
+  const password = `pa${String.fromCodePoint(0x00e9)}ss${String.fromCodePoint(0x1f512)}`;
+  const hash = await hashPassword(password);
+
+  assert.equal(await verifyPassword(hash, password), true);
+  assert.equal(await verifyPassword(hash, `${password}x`), false);
+});
+
+test("verifies a hash written under older, non-default parameters", async () => {
+  // Build a PHC string at a lower cost than the current defaults (m=19456,t=2,p=1);
+  // verify must recompute under the STORED params, not the current constants (D17).
+  const salt = Buffer.alloc(16, 7);
+  const b64 = (buf: Buffer) => buf.toString("base64").replaceAll("=", "");
+  const oldTag = Buffer.from(
+    await argon2Async("argon2id", {
+      message: PASSWORD,
+      nonce: salt,
+      parallelism: 1,
+      tagLength: 32,
+      memory: 8,
+      passes: 1,
+    }),
+  );
+  const oldHash = `$argon2id$v=19$m=8,t=1,p=1$${b64(salt)}$${b64(oldTag)}`;
+
+  assert.equal(await verifyPassword(oldHash, PASSWORD), true);
+  assert.equal(await verifyPassword(oldHash, "wrong password entirely"), false);
+});
+
+test("throws on a malformed stored hash", async () => {
+  const badFormat = [
+    "not-a-hash", // too few "$" segments
+    "$argon2i$v=19$m=19456,t=2,p=1$c2FsdA$dGFn", // wrong algorithm
+    "$argon2id$v=13$m=19456,t=2,p=1$c2FsdA$dGFn", // wrong version
+    "$argon2id$v=19$m=19456,t=2,p=1$c2FsdA", // missing the tag segment
+  ];
+  for (const stored of badFormat) {
+    await assert.rejects(verifyPassword(stored, PASSWORD), /expected argon2id PHC format/);
+  }
+
+  await assert.rejects(
+    verifyPassword("$argon2id$v=19$m=x,t=2,p=1$c2FsdA$dGFn", PASSWORD),
+    /malformed argon2id parameters/,
+  );
+});
