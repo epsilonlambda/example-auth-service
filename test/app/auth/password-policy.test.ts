@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkPassword } from "../src/app/auth/password-policy.ts";
+import { checkPassword } from "#app/auth/password-policy.ts";
 
 const USERNAME = "kirill";
 

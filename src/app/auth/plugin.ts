@@ -1,7 +1,7 @@
 import type { FastifyPluginAsyncJsonSchemaToTs } from "@fastify/type-provider-json-schema-to-ts";
 import type { FastifyReply } from "fastify";
 import fp from "fastify-plugin";
-import { AppError, makeErrorEnvelope } from "../error-envelope.ts";
+import { AppError, makeErrorEnvelope } from "#app/error-envelope.ts";
 import { parseBasicAuth } from "./basic-auth.ts";
 import { hashPassword, verifyPassword } from "./crypto.ts";
 import { checkPassword, normalizePassword, PASSWORD_MAX_CODE_POINTS } from "./password-policy.ts";

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsyncJsonSchemaToTs } from "@fastify/type-provider-json-schema-to-ts";
 import fp from "fastify-plugin";
-import { AppError } from "../error-envelope.ts";
+import { AppError } from "#app/error-envelope.ts";
 
 const healthResponseSchema = {
   type: "object",

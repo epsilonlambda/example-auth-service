@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseBasicAuth } from "../src/app/auth/basic-auth.ts";
+import { parseBasicAuth } from "#app/auth/basic-auth.ts";
 
 function header(userpass: string): string {
   return `Basic ${Buffer.from(userpass, "utf8").toString("base64")}`;

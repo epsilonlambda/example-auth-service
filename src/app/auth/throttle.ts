@@ -1,4 +1,4 @@
-import type { DataStore } from "../data-store/plugin.ts";
+import type { DataStore } from "#app/data-store/plugin.ts";
 
 // Per-username login throttle (D23/D36/D47), NIST SP 800-63B-4 rate-limiting.
 // registerAttempt increments and gates in one atomic step *before* hashing: the

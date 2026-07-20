@@ -4,6 +4,10 @@
   "private": true,
   "description": "Credential management and authentication API for internal services",
   "type": "module",
+  "imports": {
+    "#app/*": "./src/app/*",
+    "#test/*": "./test/*"
+  },
   "engines": {
     "node": ">=24.7.0"
   },

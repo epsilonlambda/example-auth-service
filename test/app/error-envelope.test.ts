@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildTestApp } from "./helpers.ts";
+import { buildTestApp } from "#test/helpers.ts";
 
 test("unknown routes return the not_found envelope", async (t) => {
   const { app } = buildTestApp();

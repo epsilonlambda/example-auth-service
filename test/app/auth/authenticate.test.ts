@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { performance } from "node:perf_hooks";
 import { test } from "node:test";
-import { buildTestApp } from "./helpers.ts";
+import { buildTestApp } from "#test/helpers.ts";
 
 type TestApp = ReturnType<typeof buildTestApp>["app"];
 
