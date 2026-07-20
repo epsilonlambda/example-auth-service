@@ -1,6 +1,6 @@
 import type { FastifyServerOptions } from "fastify";
-import { buildApp } from "../src/app.ts";
-import type { DataStore } from "../src/data-store/plugin.ts";
+import type { DataStore } from "../src/app/data-store/plugin.ts";
+import { buildApp } from "../src/app/index.ts";
 
 export interface SetCall {
   key: string;

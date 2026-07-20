@@ -1,9 +1,9 @@
 import type { JsonSchemaToTsProvider } from "@fastify/type-provider-json-schema-to-ts";
 import fastify, { type FastifyServerOptions } from "fastify";
+import { authPlugin } from "./auth/plugin.ts";
 import { type DataStore, dataStorePlugin } from "./data-store/plugin.ts";
 import { applyErrorEnvelope } from "./error-envelope.ts";
-import { healthRoutes } from "./routes/health.ts";
-import { usersRoutes } from "./routes/users.ts";
+import { healthPlugin } from "./health/plugin.ts";
 
 export type AppOptions = { fastifyOptions?: FastifyServerOptions } & (
   | { redisUrl: string }
@@ -34,13 +34,12 @@ export function buildApp(options: AppOptions) {
 
   applyErrorEnvelope(app);
 
-  // Map the app's options to the plugin's: a ready store, or a URL to build one.
   app.register(
     dataStorePlugin,
     "store" in options ? { store: options.store } : { redisUrl: options.redisUrl },
   );
-  app.register(usersRoutes);
-  app.register(healthRoutes);
+  app.register(authPlugin);
+  app.register(healthPlugin);
 
   return app;
 }

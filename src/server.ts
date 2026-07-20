@@ -1,7 +1,4 @@
-import { buildApp } from "./app.ts";
-import { assertCryptoCapability } from "./boot-check.ts";
-
-assertCryptoCapability();
+import { buildApp } from "./app/index.ts";
 
 const port = Number(process.env.PORT ?? 3000);
 const redisUrl = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";

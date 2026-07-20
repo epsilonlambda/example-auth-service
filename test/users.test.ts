@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { verifyPassword } from "../src/crypto.ts";
+import { verifyPassword } from "../src/app/auth/crypto.ts";
 import { buildTestApp } from "./helpers.ts";
 
 type TestApp = ReturnType<typeof buildTestApp>["app"];

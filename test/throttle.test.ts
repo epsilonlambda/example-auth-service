@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { THROTTLE_MAX_FAILURES } from "../src/throttle.ts";
+import { THROTTLE_MAX_FAILURES } from "../src/app/auth/throttle.ts";
 import { buildTestApp } from "./helpers.ts";
 
 type TestApp = ReturnType<typeof buildTestApp>["app"];

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { argon2 } from "node:crypto";
 import { test } from "node:test";
 import { promisify } from "node:util";
-import { hashPassword, verifyPassword } from "../src/crypto.ts";
+import { hashPassword, verifyPassword } from "../src/app/auth/crypto.ts";
 
 const argon2Async = promisify(argon2);
 

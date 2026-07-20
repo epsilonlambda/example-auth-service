@@ -1,10 +1,11 @@
 import type { FastifyPluginAsyncJsonSchemaToTs } from "@fastify/type-provider-json-schema-to-ts";
 import type { FastifyReply } from "fastify";
-import { parseBasicAuth } from "../basic-auth.ts";
-import { hashPassword, verifyPassword } from "../crypto.ts";
+import fp from "fastify-plugin";
 import { AppError, makeErrorEnvelope } from "../error-envelope.ts";
-import { checkPassword, normalizePassword, PASSWORD_MAX_CODE_POINTS } from "../password-policy.ts";
-import { registerAttempt, resetFailures } from "../throttle.ts";
+import { parseBasicAuth } from "./basic-auth.ts";
+import { hashPassword, verifyPassword } from "./crypto.ts";
+import { checkPassword, normalizePassword, PASSWORD_MAX_CODE_POINTS } from "./password-policy.ts";
+import { registerAttempt, resetFailures } from "./throttle.ts";
 
 // Lowercase subset of the POSIX portable-username charset, first character
 // alphanumeric, 3-32 chars. Doubles as Redis key-injection defense: the
@@ -70,7 +71,7 @@ function challenge(reply: FastifyReply, code: string, message: string) {
     .send(makeErrorEnvelope(code, message));
 }
 
-export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs = async (app) => {
+const authRoutes: FastifyPluginAsyncJsonSchemaToTs = async (app) => {
   app.post(
     "/api/v1/users",
     {
@@ -164,3 +165,11 @@ export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs = async (app) => {
     },
   );
 };
+
+// Encapsulated feature plugin that declares its dependency on the data store:
+// Fastify throws at boot if `dataStore` is not decorated before this registers.
+export const authPlugin = fp(authRoutes, {
+  name: "auth",
+  encapsulate: true,
+  decorators: { fastify: ["dataStore"] },
+});
