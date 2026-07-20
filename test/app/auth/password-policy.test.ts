@@ -92,3 +92,31 @@ test("near-miss of a blocklist entry passes the residual check", () => {
   const result = validatePassword("manchesterunited1", USERNAME);
   assert.equal(result.ok, true);
 });
+
+test("rejects a username shorter than the minimum (defense in depth)", () => {
+  expectRejection("h7q9w2x8k3vn5pz", "username_too_short", "ab");
+  assert.equal(validatePassword("h7q9w2x8k3vn5pz", "abc").ok, true); // 3 is allowed
+});
+
+test("accepts exactly the maximum length, rejects one over (max boundary)", () => {
+  // "x7" prefix breaks the periodicity of the repeated block, so this is long
+  // but not a repeated_block; slice to the exact boundary lengths.
+  const base = `x7${"9gk2m4p8r3t6w".repeat(40)}`;
+  assert.equal(validatePassword(base.slice(0, 512), USERNAME).ok, true);
+  expectRejection(base.slice(0, 513), "password_too_long");
+});
+
+test("structural checks handle astral (multi-code-unit) characters", () => {
+  const lock = String.fromCodePoint(0x1f512);
+  expectRejection(lock.repeat(15), "password_all_one_char");
+  expectRejection(`${lock}A`.repeat(8), "password_repeated_block");
+});
+
+test("catches keyboard walks on the home and bottom rows", () => {
+  expectRejection("asdfghjklasdfghj", "password_sequence");
+  expectRejection("zxcvbnmzxcvbnmzx", "password_sequence");
+});
+
+test("a short username is matched as a substring, even incidentally", () => {
+  expectRejection("concatenatedsecurepass", "password_contains_username", "cat");
+});
