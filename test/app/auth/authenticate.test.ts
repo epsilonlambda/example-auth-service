@@ -80,6 +80,21 @@ test("missing Authorization: 401 unauthorized, no store read", async (t) => {
   assert.deepEqual(getCalls, []);
 });
 
+test("empty password: 401 unauthorized, no store read (a secret is required)", async (t) => {
+  const { app, getCalls } = buildTestApp();
+  t.after(() => app.close());
+
+  const res = await authenticate(app, USERNAME, basic(USERNAME, ""));
+
+  assert.equal(res.statusCode, 401);
+  assert.deepEqual(res.json(), {
+    error: { code: "unauthorized", message: "authentication required" },
+  });
+  assert.equal(res.headers["www-authenticate"], CHALLENGE);
+  assert.equal(res.headers["cache-control"], "no-store");
+  assert.deepEqual(getCalls, []);
+});
+
 test("username mismatch: 400 before any store I/O", async (t) => {
   const { app, getCalls } = buildTestApp();
   t.after(() => app.close());
