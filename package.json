@@ -18,6 +18,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "test": "node --test \"test/**/*.test.ts\"",
+    "coverage": "node --test --experimental-test-coverage \"test/**/*.test.ts\"",
+    "coverage:lcov": "mkdir -p coverage && node --test --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info \"test/**/*.test.ts\"",
     "test:e2e": "E2E_BASE_URL=http://127.0.0.1:3000 node --test test/e2e.test.ts",
     "check": "npm run typecheck && npm run lint && npm test"
   },
