@@ -1,4 +1,4 @@
-import type { RedisLike } from "./deps.ts";
+import type { DataStore } from "./data-store/plugin.ts";
 
 // Per-username login throttle (D23/D36/D47), NIST SP 800-63B-4 rate-limiting.
 // registerAttempt increments and gates in one atomic step *before* hashing: the
@@ -17,8 +17,8 @@ function throttleKey(username: string): string {
 
 // Counts this attempt and returns the Retry-After seconds if it is over the
 // limit, else null to proceed.
-export async function registerAttempt(redis: RedisLike, username: string): Promise<number | null> {
-  const { count, ttl } = await redis.incrementCounter(
+export async function registerAttempt(store: DataStore, username: string): Promise<number | null> {
+  const { count, ttl } = await store.incrementCounter(
     throttleKey(username),
     THROTTLE_WINDOW_SECONDS,
   );
@@ -28,6 +28,6 @@ export async function registerAttempt(redis: RedisLike, username: string): Promi
   return null;
 }
 
-export async function resetFailures(redis: RedisLike, username: string): Promise<void> {
-  await redis.clearCounter(throttleKey(username));
+export async function resetFailures(store: DataStore, username: string): Promise<void> {
+  await store.clearCounter(throttleKey(username));
 }

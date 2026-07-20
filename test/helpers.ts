@@ -1,17 +1,17 @@
 import type { FastifyServerOptions } from "fastify";
 import { buildApp } from "../src/app.ts";
-import type { RedisLike } from "../src/deps.ts";
+import type { DataStore } from "../src/data-store/plugin.ts";
 
 export interface SetCall {
   key: string;
   value: string;
-  options: unknown;
+  mode: "insert" | "upsert";
 }
 
 // In-memory stand-in honoring SET-NX semantics, with call recording so tests
 // can assert what reached the store (and what never did). incrementCounter bumps
 // the count, fixes the window once (EXPIRE NX), and returns count + ttl.
-export function makeFakeRedis() {
+export function makeFakeDataStore() {
   const store = new Map<string, string>();
   const setCalls: SetCall[] = [];
   const getCalls: string[] = [];
@@ -20,14 +20,14 @@ export function makeFakeRedis() {
   const incrementCounterCalls: string[] = [];
   let pingError: Error | null = null;
 
-  const redis: RedisLike = {
-    async set(key, value, options) {
-      setCalls.push({ key, value, options });
-      if (store.has(key)) {
-        return null;
+  const dataStore: DataStore = {
+    async set(key, value, mode) {
+      setCalls.push({ key, value, mode });
+      if (mode === "insert" && store.has(key)) {
+        return false;
       }
       store.set(key, value);
-      return "OK";
+      return true;
     },
     async get(key) {
       getCalls.push(key);
@@ -37,7 +37,6 @@ export function makeFakeRedis() {
       if (pingError) {
         throw pingError;
       }
-      return "PONG";
     },
     async incrementCounter(key, windowSeconds) {
       incrementCounterCalls.push(key);
@@ -55,7 +54,7 @@ export function makeFakeRedis() {
   };
 
   return {
-    redis,
+    dataStore,
     store,
     setCalls,
     getCalls,
@@ -67,17 +66,17 @@ export function makeFakeRedis() {
   };
 }
 
-// Real argon2 runs: the routes import crypto directly, so only Redis is faked.
+// Real argon2 runs: the routes import crypto directly, so only the store is faked.
 export function buildTestApp(opts: FastifyServerOptions = {}) {
-  const fakeRedis = makeFakeRedis();
-  const app = buildApp(opts, { redis: fakeRedis.redis });
+  const fakeStore = makeFakeDataStore();
+  const app = buildApp({ fastifyOptions: opts, store: fakeStore.dataStore });
   return {
     app,
-    store: fakeRedis.store,
-    setCalls: fakeRedis.setCalls,
-    getCalls: fakeRedis.getCalls,
-    throttleStore: fakeRedis.throttleStore,
-    incrementCounterCalls: fakeRedis.incrementCounterCalls,
-    failPing: fakeRedis.failPing,
+    store: fakeStore.store,
+    setCalls: fakeStore.setCalls,
+    getCalls: fakeStore.getCalls,
+    throttleStore: fakeStore.throttleStore,
+    incrementCounterCalls: fakeStore.incrementCounterCalls,
+    failPing: fakeStore.failPing,
   };
 }

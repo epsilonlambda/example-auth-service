@@ -2,7 +2,6 @@ import type { FastifyPluginAsyncJsonSchemaToTs } from "@fastify/type-provider-js
 import type { FastifyReply } from "fastify";
 import { parseBasicAuth } from "../basic-auth.ts";
 import { hashPassword, verifyPassword } from "../crypto.ts";
-import type { AppDeps } from "../deps.ts";
 import { AppError, makeErrorEnvelope } from "../error-envelope.ts";
 import { checkPassword, normalizePassword, PASSWORD_MAX_CODE_POINTS } from "../password-policy.ts";
 import { registerAttempt, resetFailures } from "../throttle.ts";
@@ -71,10 +70,7 @@ function challenge(reply: FastifyReply, code: string, message: string) {
     .send(makeErrorEnvelope(code, message));
 }
 
-export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs<{ Options: AppDeps }> = async (
-  app,
-  { redis },
-) => {
+export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs = async (app) => {
   app.post(
     "/api/v1/users",
     {
@@ -92,10 +88,12 @@ export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs<{ Options: AppDeps }>
       }
 
       const passwordHash = await hashPassword(verdict.normalized);
-      const created = await redis.set(`user:${username}`, JSON.stringify({ passwordHash }), {
-        condition: "NX",
-      });
-      if (created === null) {
+      const created = await app.dataStore.set(
+        `user:${username}`,
+        JSON.stringify({ passwordHash }),
+        "insert",
+      );
+      if (!created) {
         throw new AppError(409, "username_taken", "username is already taken");
       }
 
@@ -137,7 +135,7 @@ export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs<{ Options: AppDeps }>
           );
       }
 
-      const retryAfter = await registerAttempt(redis, username);
+      const retryAfter = await registerAttempt(app.dataStore, username);
       if (retryAfter !== null) {
         return reply
           .status(429)
@@ -147,7 +145,7 @@ export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs<{ Options: AppDeps }>
 
       const normalizedPassword = normalizePassword(credentials.password);
 
-      const storedUserData = await redis.get(`user:${username}`);
+      const storedUserData = await app.dataStore.get(`user:${username}`);
       if (!storedUserData) {
         // Mitigate user enumeration via a timing-attack - perform same amount of work on auth attempts
         // for users that don't exist
@@ -157,7 +155,7 @@ export const usersRoutes: FastifyPluginAsyncJsonSchemaToTs<{ Options: AppDeps }>
         const isPasswordVerified = await verifyPassword(storedHash, normalizedPassword);
 
         if (isPasswordVerified) {
-          await resetFailures(redis, username);
+          await resetFailures(app.dataStore, username);
           return reply.status(200).send({ username });
         }
       }

@@ -1,5 +1,4 @@
 import type { FastifyPluginAsyncJsonSchemaToTs } from "@fastify/type-provider-json-schema-to-ts";
-import type { RedisLike } from "../deps.ts";
 import { AppError } from "../error-envelope.ts";
 
 const healthResponseSchema = {
@@ -11,9 +10,7 @@ const healthResponseSchema = {
   },
 } as const;
 
-export const healthRoutes: FastifyPluginAsyncJsonSchemaToTs<{
-  Options: { redis: RedisLike };
-}> = async (app, { redis }) => {
+export const healthRoutes: FastifyPluginAsyncJsonSchemaToTs = async (app) => {
   app.get(
     "/health",
     {
@@ -23,7 +20,7 @@ export const healthRoutes: FastifyPluginAsyncJsonSchemaToTs<{
     },
     async (request) => {
       try {
-        await redis.ping();
+        await app.dataStore.ping();
       } catch (err) {
         request.log.error({ err }, "health check ping failed");
         throw new AppError(503, "unhealthy", "dependency check failed");

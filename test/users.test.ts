@@ -25,7 +25,7 @@ test("creates a user: 201, Location header, minimal body", async (t) => {
   const call = setCalls[0];
   assert.ok(call);
   assert.equal(call.key, "user:kirill");
-  assert.deepEqual(call.options, { condition: "NX" });
+  assert.equal(call.mode, "insert");
   const stored = JSON.parse(call.value) as { passwordHash: string };
   assert.match(stored.passwordHash, /^\$argon2id\$v=19\$/);
   assert.equal(await verifyPassword(stored.passwordHash, GOOD_PASSWORD), true);
