@@ -2,7 +2,7 @@ import type { FastifyPluginAsyncJsonSchemaToTs } from "@fastify/type-provider-js
 import type { FastifyReply } from "fastify";
 import fp from "fastify-plugin";
 import { AppError, makeErrorEnvelope } from "#app/error-envelope.ts";
-import { parseBasicAuth } from "./basic-auth.ts";
+import { challenge, parseBasicAuth } from "./basic-auth.ts";
 import { hashPassword, verifyPassword } from "./crypto.ts";
 import { checkPassword, normalizePassword, PASSWORD_MAX_CODE_POINTS } from "./password-policy.ts";
 import { registerAttempt, resetFailures } from "./throttle.ts";
@@ -63,13 +63,6 @@ const authenticateParamsSchema = {
     username: { type: "string" },
   },
 } as const;
-
-function challenge(reply: FastifyReply, code: string, message: string) {
-  return reply
-    .status(401)
-    .header("www-authenticate", WWW_AUTHENTICATE)
-    .send(makeErrorEnvelope(code, message));
-}
 
 const authRoutes: FastifyPluginAsyncJsonSchemaToTs = async (app) => {
   app.post(
