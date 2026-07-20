@@ -23,6 +23,11 @@ export async function registerAttempt(store: DataStore, username: string): Promi
     THROTTLE_WINDOW_SECONDS,
   );
   if (count > THROTTLE_MAX_FAILURES) {
+    /**
+     * Redis can return negative TTL values when a key doesn't exist/doesn't have expiry set.
+     * This check protects a future refactor from returning those sentinel values as TTL used in Retry-After headers
+     * See https://redis.io/docs/latest/commands/ttl/
+     */
     return ttl > 0 ? ttl : THROTTLE_WINDOW_SECONDS;
   }
   return null;
