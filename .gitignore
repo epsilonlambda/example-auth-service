@@ -1,5 +1,8 @@
 .idea/
-docs/
+
+# Local working material stays out; the decision log is published (see D57).
+docs/*
+!docs/DECISIONS.md
 
 node_modules/
 coverage/

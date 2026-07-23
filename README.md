@@ -304,10 +304,11 @@ I've briefed my AI agent on the overall goal of the project and I started to tel
 its reaction. The goal was to discover blind spots in my design and to "instantiate" my design with concrete frameworks
 and configuration decisions.
 
-Throughout the process, I asked it to maintain a "decision log" - a file where it would put every major decision
+Throughout the process, I asked it to maintain a ["decision log"](docs/DECISIONS.md) - a file where it would put every major decision
 that I commit to. While the decisions/ideas themselves were mine, that log was written by the agent - in part for 
 convenience, but also to maximize its utility to the agent in the next phase (i.e. I assumed it knew better how to phrase
-things in a way that would be read back with more precision later)
+things in a way that would be read back with more precision later). That log is committed in this repo as
+[docs/DECISIONS.md](docs/DECISIONS.md), lightly edited for publication.
 
 For example, at first I described why I would not implement token issuance or session maintenance for an internal auth 
 service, and similar high-level/"product-level" decisions.
