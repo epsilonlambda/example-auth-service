@@ -41,7 +41,7 @@ export const dataStorePlugin = fp<DataStorePluginOptions>(
         const [count, , ttl] = await client
           .multi()
           .incr(key)
-           // Do not reset the window every time to prevent DoS on known users
+          // Do not reset the window every time to prevent DoS on known users
           .expire(key, windowSeconds, "NX")
           .ttl(key)
           .exec();
