@@ -292,4 +292,90 @@ but at the same time, introducing this complexity would go against keeping this 
 use a newer (arguable more security-patched) Node with built-in support than a third-party package.
 - 
 
-**REMAINDER OF DOCUMENTATION TO BE CONTINUED...**
+**REMAINDER OF THIS SECTION TO BE CONTINUED...**
+
+## AI Usage Disclosure
+
+I've chosen to use Claude Code cli running on Fable 5/Opus 4.8 at xhigh effort level (via my 20x Max individual subscription),
+as part of the following workflow:
+
+### Phase 1: Architecture Planning
+I've briefed my AI agent on the overall goal of the project and I started to tell it how I'd implement it to get
+its reaction. The goal was to discover blind spots in my design and to "instantiate" my design with concrete frameworks
+and configuration decisions.
+
+Throughout the process, I asked it to maintain a "decision log" - a file where it would put every major decision
+that I commit to. While the decisions/ideas themselves were mine, that log was written by the agent - in part for 
+convenience, but also to maximize its utility to the agent in the next phase (i.e. I assumed it knew better how to phrase
+things in a way that would be read back with more precision later)
+
+For example, at first I described why I would not implement token issuance or session maintenance for an internal auth 
+service, and similar high-level/"product-level" decisions.
+
+Then, I delved into areas like:
+- which standards are out there (e.g. NIST, OWASP guidelines, etc), and how I can implement them in a practical way
+- which exact hashing alogrithm to use (I knew bcrypt from before, but this time I've discovered that standards got
+updated to recommend argon)
+- concrete choice of framework (e.g. Express is too low-level - more bug surface to maintain, Nest is too over-engineered 
+for an API of two endpoints, etc) and the stance on third-party dependencies in a security-sensitive context (i.e.
+avoid dependendencies and keep the app simple as a defensive posture, of sorts; no third-party dependencies for crypto, 
+because that's the secure core of our solution - trusting Node.js built-in support more than anything from npm)
+- maximal practical adherence to REST (e.g. most examples of auth I've seen do a POST to login - I deliberately
+broke that tradition with my GET+Basic Auth approach in exchange for looking more RESTful)
+- testing strategies
+
+
+### Phase 2: Implementation
+I would describe which "layer" of the solution would be implemented at the start of each separate session in this phase.
+Each session would branch off a compacted conversation from Phase 1, separately including the decision log into the context window
+before the start of the implementation session. At the end of every session, I'd branch a new conversation, ask it to summarize
+everything from the (compacted) end of Phase 1, and then the next session would continue from a context that included 
+compacted Phase 1 and a series of summaries of the Phase 2 layers implemented so far. I believe this allowed the agent
+to have maximum awareness of how the project is evolving, while attempting not to run out of practical context window limit.
+
+I'd put the agent into plan mode, ask it to ask question and present a plan for my review. After iterating on the plan and
+approving it, I'd let the agent work. Then, I'd ask the agent to self-review its own changes. After that, I'd do manual
+review through Pycharm and tweak things/ask questions and taken notes for certain changes/decisions I'd want to work on after Phase 2.
+
+### Phase 3: End-to-end Manual Review
+Once we were code-complete, I reviewed the entire codebase, challenging decisions and implementation details - 
+I'd ask the agent why something was implemented in a particular way, sometimes propose alternatives, ask about pros and cons,
+and make modifications.
+
+Examples of larger corrections included:
+- Abandoned the dependency-injection pattern built into the project, which was over-engineering for the scope we have
+- Adopted Fastify-idiomatic plugin pattern to make the project structure a bit more recognizable to a reader who worked with 
+Fastify before
+- Identified and fixed a TOCTTOU issue with our throttling logic
+- Configured Redis to flush every update to disk, deciding that I'd "buy" confidence that every user registration
+is persisted at the tradeoff of disk I/O and performance on the Redis side, at scale.
+
+
+### Which parts of this project have been executed by me (the human)
+- Bugfixes and certain refactors
+- All ideas, decisions, and system design
+- Scaffolding for many things, and for the documentation
+- Manual verification of referenced documentation and standards. In particular, I tried to manually verify the NIST and OWASP standards 
+the agent referenced in its implementation, by opening relevant links myself, reading the standards and reading the 
+code and documentation.
+- Limitations, Design Decisions & Rationale, and this AI Usage Disclosure Section
+- Manual code review. I've spend more time reading/reviewing/correcting than writing net-new code.
+
+### Which parts of this project have been written by AI?
+- Most of the code
+- All of the test code
+- Most of this README (i.e. the repetitive pieces like enumerating error codes, responses etc)
+
+### What I would have done differently if I had to do this again
+
+- Protect the decision log from the agent's edits after Phase 1. Closer to the end of the project, the decision log
+started to be more "spammy", containing smaller-scoped decisions, overshadowing the larger, more important ones from earlier
+- Scaffold the project myself by hand a bit more before letting the agent go on to Phase 2. The refactor to get rid of 
+unnecessary DI could have been avoided
+- Make each "layer" of Phase 2 scoped a bit more precisely - i.e. more sessions/iterations, each session with smaller scope of work.
+- My own AI agent suggested we should have parallelized the layers/implementation sessions. I might consider that, 
+but I'm not completely sure, because 
+the deliberate pace and sequencing, while slow, helped me stay focused, which, I would argue, is sometimes more important than
+speed when implementing something security-related, like an auth service (albeit within reason). The need for that tradeoff
+is a matter of taste and it depends on the amount of review bandwidth I (as a human developer) might have on any given day.
+
